@@ -1,0 +1,260 @@
+-- ============================================
+-- DARK HUB - Blox Fruits
+-- ============================================
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("ReplicatedStorage")
+local player = Players.LocalPlayer
+local pg = player:WaitForChild("PlayerGui")
+
+-- Evita duplicar
+local antigo = pg:FindFirstChild("DarkHub")
+if antigo then antigo:Destroy() end
+
+-- ============================================
+-- GUI
+-- ============================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "DarkHub"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = pg
+
+-- Botão "D" (bolinha)
+local botaoD = Instance.new("TextButton")
+botaoD.Size = UDim2.fromOffset(55, 55)
+botaoD.Position = UDim2.new(0, 20, 0.5, -27)
+botaoD.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+botaoD.Text = "D"
+botaoD.TextColor3 = Color3.fromRGB(255, 255, 255)
+botaoD.TextSize = 26
+botaoD.Font = Enum.Font.GothamBold
+botaoD.AutoButtonColor = false
+botaoD.Parent = gui
+Instance.new("UICorner", botaoD).CornerRadius = UDim.new(1, 0)
+local strokeD = Instance.new("UIStroke", botaoD)
+strokeD.Color = Color3.fromRGB(80, 80, 80)
+strokeD.Thickness = 1.5
+
+-- Janela principal
+local hub = Instance.new("Frame")
+hub.Size = UDim2.fromOffset(340, 280)
+hub.Position = UDim2.new(0.5, -170, 0.5, -140)
+hub.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+hub.Visible = false
+hub.Parent = gui
+Instance.new("UICorner", hub).CornerRadius = UDim.new(0, 10)
+local strokeHub = Instance.new("UIStroke", hub)
+strokeHub.Color = Color3.fromRGB(55, 55, 55)
+strokeHub.Thickness = 1
+
+-- Título
+local titulo = Instance.new("TextLabel")
+titulo.Size = UDim2.new(1, -60, 0, 40)
+titulo.Position = UDim2.fromOffset(15, 5)
+titulo.BackgroundTransparency = 1
+titulo.Text = "DARK HUB"
+titulo.TextColor3 = Color3.fromRGB(255, 255, 255)
+titulo.TextSize = 20
+titulo.Font = Enum.Font.GothamBold
+titulo.TextXAlignment = Enum.TextXAlignment.Left
+titulo.Parent = hub
+
+-- Linha
+local linha = Instance.new("Frame")
+linha.Size = UDim2.new(1, -20, 0, 1)
+linha.Position = UDim2.fromOffset(10, 48)
+linha.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+linha.BorderSizePixel = 0
+linha.Parent = hub
+
+-- Fechar
+local fechar = Instance.new("TextButton")
+fechar.Size = UDim2.fromOffset(28, 28)
+fechar.Position = UDim2.new(1, -38, 0, 10)
+fechar.BackgroundColor3 = Color3.fromRGB(170, 35, 35)
+fechar.Text = "X"
+fechar.TextColor3 = Color3.fromRGB(255, 255, 255)
+fechar.TextSize = 16
+fechar.Font = Enum.Font.GothamBold
+fechar.AutoButtonColor = false
+fechar.Parent = hub
+Instance.new("UICorner", fechar).CornerRadius = UDim.new(0, 6)
+
+-- Botão Auto Farm
+local btnFarm = Instance.new("TextButton")
+btnFarm.Size = UDim2.new(1, -30, 0, 42)
+btnFarm.Position = UDim2.fromOffset(15, 65)
+btnFarm.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+btnFarm.Text = "Auto Farm: OFF"
+btnFarm.TextColor3 = Color3.fromRGB(255, 255, 255)
+btnFarm.TextSize = 15
+btnFarm.Font = Enum.Font.GothamBold
+btnFarm.AutoButtonColor = false
+btnFarm.Parent = hub
+Instance.new("UICorner", btnFarm).CornerRadius = UDim.new(0, 8)
+
+-- Status
+local status = Instance.new("TextLabel")
+status.Size = UDim2.new(1, -30, 0, 60)
+status.Position = UDim2.fromOffset(15, 115)
+status.BackgroundTransparency = 1
+status.Text = "Status: Parado"
+status.TextColor3 = Color3.fromRGB(160, 160, 160)
+status.TextSize = 13
+status.Font = Enum.Font.Gotham
+status.TextWrapped = true
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Parent = hub
+
+-- ============================================
+-- LÓGICA DE AUTO FARM (Blox Fruits)
+-- ============================================
+local autoFarmAtivo = false
+local farmThread = nil
+
+-- Função: pega o CommF_ (remote principal do Blox Fruits)
+local function getCommF()
+    local remotes = RS:FindFirstChild("Remotes")
+    return remotes and remotes:FindFirstChild("CommF_")
+end
+
+-- Função: teleporta o personagem até uma posição (tween suave)
+local function teleportarPara(posicao)
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local TweenService = game:GetService("TweenService")
+    local dist = (hrp.Position - posicao).Magnitude
+    local tempo = math.clamp(dist / 500, 0.1, 1.5)
+    local tween = TweenService:Create(hrp, TweenInfo.new(tempo, Enum.EasingStyle.Linear), {CFrame = CFrame.new(posicao)})
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- Função: procura o inimigo mais próximo do nível do jogador
+local function acharInimigo()
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local inimigos = workspace:FindFirstChild("Enemies")
+    if not inimigos then return nil end
+
+    local maisProximo, menorDist = nil, math.huge
+    for _, inimigo in ipairs(inimigos:GetChildren()) do
+        local hum = inimigo:FindFirstChild("Humanoid")
+        local iHrp = inimigo:FindFirstChild("HumanoidRootPart")
+        if hum and iHrp and hum.Health > 0 then
+            local d = (hrp.Position - iHrp.Position).Magnitude
+            if d < menorDist then
+                menorDist = d
+                maisProximo = inimigo
+            end
+        end
+    end
+    return maisProximo
+end
+
+local function rodarFarm()
+    while autoFarmAtivo do
+        pcall(function()
+            local commF = getCommF()
+            local alvo = acharInimigo()
+
+            if alvo then
+                local iHrp = alvo:FindFirstChild("HumanoidRootPart")
+                local hum = alvo:FindFirstChild("Humanoid")
+                if iHrp and hum and hum.Health > 0 then
+                    -- Teleporta perto do inimigo
+                    teleportarPara(iHrp.Position + Vector3.new(0, 5, 0))
+                    -- Ataca
+                    if commF then
+                        pcall(function()
+                            commF:InvokeServer("CommF_", "Attack")
+                        end)
+                    end
+                    -- Tenta usar a arma equipada
+                    local char = player.Character
+                    if char then
+                        local tool = char:FindFirstChildOfClass("Tool")
+                        if tool then tool:Activate() end
+                    end
+                end
+            end
+        end)
+        task.wait(0.3)
+    end
+end
+
+local function ligarFarm()
+    autoFarmAtivo = true
+    btnFarm.Text = "Auto Farm: ON"
+    btnFarm.BackgroundColor3 = Color3.fromRGB(30, 130, 60)
+    status.Text = "Status: Farmando..."
+    status.TextColor3 = Color3.fromRGB(80, 220, 120)
+    farmThread = task.spawn(rodarFarm)
+end
+
+local function desligarFarm()
+    autoFarmAtivo = false
+    if farmThread then
+        task.cancel(farmThread)
+        farmThread = nil
+    end
+    btnFarm.Text = "Auto Farm: OFF"
+    btnFarm.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+    status.Text = "Status: Parado"
+    status.TextColor3 = Color3.fromRGB(160, 160, 160)
+end
+
+-- ============================================
+-- EVENTOS
+-- ============================================
+botaoD.MouseButton1Click:Connect(function()
+    hub.Visible = not hub.Visible
+end)
+
+fechar.MouseButton1Click:Connect(function()
+    hub.Visible = false
+end)
+
+btnFarm.MouseButton1Click:Connect(function()
+    if autoFarmAtivo then desligarFarm() else ligarFarm() end
+end)
+
+-- Hover
+botaoD.MouseEnter:Connect(function() botaoD.BackgroundColor3 = Color3.fromRGB(40, 40, 40) end)
+botaoD.MouseLeave:Connect(function() botaoD.BackgroundColor3 = Color3.fromRGB(18, 18, 18) end)
+fechar.MouseEnter:Connect(function() fechar.BackgroundColor3 = Color3.fromRGB(220, 50, 50) end)
+fechar.MouseLeave:Connect(function() fechar.BackgroundColor3 = Color3.fromRGB(170, 35, 35) end)
+
+-- Arrastar
+local arrastando, dragInicio, posInicio = false, nil, nil
+titulo.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        arrastando = true
+        dragInicio = input.Position
+        posInicio = hub.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if arrastando and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragInicio
+        hub.Position = UDim2.new(posInicio.X.Scale, posInicio.X.Offset + delta.X, posInicio.Y.Scale, posInicio.Y.Offset + delta.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        arrastando = false
+    end
+end)
+
+-- Garante que arrastando volte a false se soltar fora
+titulo.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        arrastando = false
+    end
+end)
+
+print("[Dark Hub] Carregado!")
